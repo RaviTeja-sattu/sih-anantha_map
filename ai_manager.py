@@ -67,60 +67,94 @@ class AIManager:
             
             # Enhanced prompt with correct schema information
             prompt = f"""
-            You are an expert PostgreSQL and oceanographic data analyst for Argo floats.
-            
-            DATABASE SCHEMA:
-            Table: argo_metadata (569 rows)
-            - float_id (bigint): Unique identifier for each float
-            - dominant_region (text): Ocean region (e.g., 'Indian Ocean', 'North Pacific')  
-            - num_profiles (integer): Number of profiles collected
-            - launch_date (text): When float was deployed
-            - launch_latitude, launch_longitude (numeric): Deployment coordinates
-            - centroid_lat, centroid_lon (numeric): Average position
-            - end_mission_status (text): Current status
-            - project_name (text): Research project
-            - pi_name (text): Principal investigator
-            
-            Table: argo_data_clean (20.4 million rows)
-            - float_id (bigint): Links to argo_metadata - THIS COLUMN EXISTS
-            - profile (integer): Profile number
-            - date (timestamp): Measurement date
-            - latitude, longitude (numeric): Position coordinates  
-            - pres_adj_dbar (numeric): Pressure/depth in decibars
-            - temp_adj_c (numeric): Adjusted temperature in Celsius
-            - psal_adj_psu (numeric): Adjusted salinity in PSU
-            - unique_id (bigint): Unique identifier for each measurement
-            
-            DATA QUALITY NOTES:
-            - Temperature range: -2°C to 57.6°C (some extreme values)
-            - Salinity range: 0 to 171,521 PSU (some extreme outliers)  
-            - Pressure range: -107 to 2,166 dbar (some negative values)
-            - No quality control columns exist
-            
-            CRITICAL REQUIREMENTS:
-            1. ALWAYS filter to selected floats: WHERE float_id IN ({float_list})
-            2. Use realistic data quality filters:
-               - temp_adj_c BETWEEN -5 AND 50 (remove extreme outliers)
-               - psal_adj_psu BETWEEN 10 AND 45 (typical ocean salinity)
-               - pres_adj_dbar BETWEEN 0 AND 2000 (positive pressures only)
-            3. ALWAYS include float_id in SELECT clause for profile data
-            4. Use LIMIT 2000 for performance (unless explicitly asked for more)
-            5. Use clear, descriptive column aliases
-            6. Handle NULL values appropriately  
-            7. Only use SELECT statements - no modifications allowed
-            
-            OCEANOGRAPHIC CONTEXT:
-            - Pressure (pres_adj_dbar) ≈ depth in meters
-            - Temperature typically ranges -2°C to 40°C in oceans
-            - Salinity typically ranges 30-40 PSU in open ocean
-            - Profiles go from surface (low pressure) to deep (high pressure)
-            
-            USER QUESTION: "{question}"
-            RESPONSE LANGUAGE: {language}
-            
-            Generate ONLY the PostgreSQL query. No explanations, comments, or markdown formatting.
-            Make the query efficient and scientifically meaningful.
-            """
+You are an expert PostgreSQL and oceanographic data analyst for Argo floats.
+
+DATABASE SCHEMA:
+Table: argo_metadata (569 rows)
+- float_id (bigint)
+- dominant_region (text)  
+- num_profiles (integer)
+- launch_date (text)
+- launch_latitude, launch_longitude (numeric)
+- centroid_lat, centroid_lon (numeric)
+- end_mission_status (text)
+- project_name (text)
+- pi_name (text)
+
+Table: argo_data_clean (20.4 million rows)
+- float_id (bigint)
+- profile (integer)
+- date (timestamp)
+- latitude, longitude (numeric)  
+- pres_adj_dbar (numeric)
+- temp_adj_c (numeric)
+- psal_adj_psu (numeric)
+- unique_id (bigint)
+
+CRITICAL REQUIREMENTS:
+1. ALWAYS filter to selected floats: WHERE float_id IN ({float_list})
+2. Use realistic data quality filters:
+   - temp_adj_c BETWEEN -5 AND 50
+   - psal_adj_psu BETWEEN 10 AND 45
+   - pres_adj_dbar BETWEEN 0 AND 2000
+3. ALWAYS include float_id in SELECT clause for profile data
+4. Use LIMIT 2000 for performance (unless explicitly asked for more)
+5. Use clear, descriptive column aliases
+6. Handle NULL values appropriately  
+7. Only use SELECT statements - no modifications allowed
+
+FEW-SHOT EXAMPLES:
+
+Q: Show me average temperature by float  
+A:
+SELECT float_id,
+       AVG(temp_adj_c) AS avg_temperature
+FROM argo_data_clean
+WHERE float_id IN ({float_list})
+  AND temp_adj_c BETWEEN -5 AND 50
+  AND psal_adj_psu BETWEEN 10 AND 45
+  AND pres_adj_dbar BETWEEN 0 AND 2000
+GROUP BY float_id
+LIMIT 2000;
+
+---
+
+Q: Get the top 10 most recent profiles with depth info  
+A:
+SELECT float_id,
+       profile,
+       date,
+       pres_adj_dbar AS pressure_dbar,
+       temp_adj_c AS temperature_c,
+       psal_adj_psu AS salinity_psu
+FROM argo_data_clean
+WHERE float_id IN ({float_list})
+  AND temp_adj_c BETWEEN -5 AND 50
+  AND psal_adj_psu BETWEEN 10 AND 45
+  AND pres_adj_dbar BETWEEN 0 AND 2000
+ORDER BY date DESC
+LIMIT 10;
+
+---
+
+Q: List floats and their number of profiles from metadata  
+A:
+SELECT float_id,
+       num_profiles AS total_profiles,
+       dominant_region
+FROM argo_metadata
+WHERE float_id IN ({float_list})
+LIMIT 2000;
+
+---
+
+USER QUESTION: "{question}"
+RESPONSE LANGUAGE: {language}
+
+RESPONSE RULES:
+- Output must contain ONLY a valid PostgreSQL SELECT query.
+- Do not include explanations, comments, markdown formatting, or any other text.
+"""
             
             response = st.session_state.gemini_model.generate_content(
                 prompt,
@@ -404,4 +438,5 @@ class AIManager:
             "x_column": x_var,
             "y_column": y_var,
             "color_column": color_var
+
         }
