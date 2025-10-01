@@ -22,7 +22,7 @@ class DatabaseManager:
         except:
             # Fallback to your exact working configuration
             return {
-                'host': '34.28.224.72',
+                'host': '136.114.8.204',
                 'database': 'postgres',
                 'user': 'postgres',
                 'password': 'nOVEMBER@141530',
@@ -340,4 +340,5 @@ class DatabaseManager:
         if not has_required_table:
             return False, "Query must reference argo_data_clean or argo_metadata tables"
         
+
         return True, "Query validation passed"
